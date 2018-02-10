@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.smart4j.chapter2.utils.PropsUtil;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -46,6 +47,11 @@ public class DatabaseHelper {
     }
 
 
+    public static DataSource getDataSource() {
+        return DATA_SOURCE;
+    }
+
+
     /**
      * 获取连接
      *
@@ -53,15 +59,15 @@ public class DatabaseHelper {
      */
     public static Connection getConnection() {
         Connection conn = CONNECTION_HOLDER.get();
-        if (conn == null) {
-            try {
+        try {
+            if (conn == null || conn.isClosed()) {
                 conn = DATA_SOURCE.getConnection();
-            } catch (SQLException e) {
-                LOGGER.error("get connection failure", e);
-                throw new RuntimeException(e);
-            } finally {
-                CONNECTION_HOLDER.set(conn);
             }
+        } catch (SQLException e) {
+            LOGGER.error("get connection failure", e);
+            throw new RuntimeException(e);
+        } finally {
+            CONNECTION_HOLDER.set(conn);
         }
         return conn;
     }
@@ -104,7 +110,7 @@ public class DatabaseHelper {
                 sql += columns.substring(0, columns.lastIndexOf("AND"));
             }
             entityList = QUERY_RUNNER.query(conn, sql, new BeanListHandler<>(entityClass),
-                    fieldMap.values());
+                    fieldMap.values().toArray());
         } catch (SQLException e) {
             LOGGER.error("query entity failure", e);
             throw new RuntimeException(e);
@@ -203,7 +209,7 @@ public class DatabaseHelper {
             return false;
         }
         String sql = "UPDATE " + getTableName(entityClass) + " SET ";
-        StringBuilder columns = new StringBuilder("(");
+        StringBuilder columns = new StringBuilder();
         for (String fieldName : fieldMap.keySet()) {
             columns.append(fieldName).append("=?, ");
         }
